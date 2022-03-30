@@ -52,8 +52,14 @@ public final class StringFunction extends FunctionN {
      */
     public static final int TRANSLATE = RPAD + 1;
 
+    /**
+     * LEVENSHTEIN() (non-standard).
+     */
+    public static final int LEVENSHTEIN = TRANSLATE + 1;
+
+
     private static final String[] NAMES = { //
-            "LOCATE", "INSERT", "REPLACE", "LPAD", "RPAD", "TRANSLATE" //
+            "LOCATE", "INSERT", "REPLACE", "LPAD", "RPAD", "TRANSLATE", "LEVENSHTEIN" //
     };
 
     private final int function;
@@ -151,11 +157,59 @@ public final class StringFunction extends FunctionN {
             v1 = ValueVarchar.get(translate(v1.getString(), matching, replacement), session);
             break;
         }
+        case LEVENSHTEIN:
+        if (v1 == ValueNull.INSTANCE || v2 == ValueNull.INSTANCE) {
+            return ValueNull.INSTANCE;
+        }
+        v1 = ValueInteger.get(levenshtein(v1.getString(), v2.getString()));
+        break;            
+
         default:
             throw DbException.getInternalError("function=" + function);
         }
         return v1;
     }
+
+    private static int levenshtein(String s1, String s2) {
+		int d[][] = new int[s1.length() + 1][s2.length() + 1];
+		
+		// Initialising first column:
+		for(int i = 0; i <= s1.length(); i++)
+			d[i][0] = i;
+		
+		// Initialising first row:
+		for(int j = 0; j <= s2.length(); j++)
+			d[0][j] = j;
+		
+		// Applying the algorithm:
+		int insertion, deletion, replacement;
+		for(int i = 1; i <= s1.length(); i++) {
+			for(int j = 1; j <= s2.length(); j++) {
+				if(s1.charAt(i - 1) == (s2.charAt(j - 1)))
+					d[i][j] = d[i - 1][j - 1];
+				else {
+					insertion = d[i][j - 1];
+					deletion = d[i - 1][j];
+					replacement = d[i - 1][j - 1];
+					
+					// Using the sub-problems
+					d[i][j] = 1 + findMin(insertion, deletion, replacement);
+				}
+			}
+		}
+		
+		return d[s1.length()][s2.length()];
+	}
+	
+  // Helper funciton used by findDistance()
+	private static int findMin(int x, int y, int z) {
+		if(x <= y && x <= z)
+			return x;
+		if(y <= x && y <= z)
+			return y;
+		else
+			return z;
+	}
 
     private static int locate(String search, String s, int start) {
         if (start < 0) {
@@ -218,6 +272,7 @@ public final class StringFunction extends FunctionN {
         boolean allConst = optimizeArguments(session, true);
         switch (function) {
         case LOCATE:
+        case LEVENSHTEIN:
             type = TypeInfo.TYPE_INTEGER;
             break;
         case INSERT:

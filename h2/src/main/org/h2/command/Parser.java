@@ -4203,6 +4203,8 @@ public class Parser {
             return new CardinalityExpression(readSingleArgument(), true);
         case "LOCATE":
             return new StringFunction(readExpression(), readNextArgument(), readIfArgument(), StringFunction.LOCATE);
+        case "LEVENSHTEIN":
+            return new StringFunction(new Expression[] {readExpression(), readNextArgument(), readLastArgument()}, StringFunction.LEVENSHTEIN);            
         case "INSERT":
             return new StringFunction(readExpression(), readNextArgument(), readNextArgument(), readLastArgument(),
                     StringFunction.INSERT);
