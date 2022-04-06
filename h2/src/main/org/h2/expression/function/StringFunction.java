@@ -201,12 +201,12 @@ public final class StringFunction extends FunctionN {
                     break;
                 }
 
-                case "prefsuf": {
+                case "prefix_suffix": {
                     v1 = ValueInteger.get(prefSuf(string1, string2));
                     break;
                 }
 
-                case "optimized_wagner": {
+                case "wagner_optimized": {
                     v1 = ValueInteger.get(optimizedWagner(string1, string2));
                     break;
                 }
