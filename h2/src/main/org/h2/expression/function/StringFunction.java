@@ -6,6 +6,10 @@
 package org.h2.expression.function;
 
 import org.h2.engine.Mode.ModeEnum;
+
+import java.util.HashSet;
+import java.util.Set;
+
 import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.expression.TypedValueExpression;
@@ -64,19 +68,36 @@ public final class StringFunction extends FunctionN {
 
     private final int function;
 
+    private Set<String> levenshteinAlgorithms; 
+
     public StringFunction(Expression arg1, Expression arg2, Expression arg3, int function) {
         super(arg3 == null ? new Expression[] { arg1, arg2 } : new Expression[] { arg1, arg2, arg3 });
         this.function = function;
+        levenshteinAlgorithms = new HashSet<String> ();
+        levenshteinAlgorithms.add("wagner");
+        levenshteinAlgorithms.add("prefsuf");
+        levenshteinAlgorithms.add("recursive");
+        levenshteinAlgorithms.add("optimized_wagner");
     }
 
     public StringFunction(Expression arg1, Expression arg2, Expression arg3, Expression arg4, int function) {
         super(new Expression[] { arg1, arg2, arg3, arg4 });
         this.function = function;
+        levenshteinAlgorithms = new HashSet<String> ();
+        levenshteinAlgorithms.add("wagner");
+        levenshteinAlgorithms.add("prefsuf");
+        levenshteinAlgorithms.add("recursive");
+        levenshteinAlgorithms.add("optimized_wagner");
     }
 
     public StringFunction(Expression[] args, int function) {
         super(args);
         this.function = function;
+        levenshteinAlgorithms = new HashSet<String> ();
+        levenshteinAlgorithms.add("wagner");
+        levenshteinAlgorithms.add("prefsuf");
+        levenshteinAlgorithms.add("recursive");
+        levenshteinAlgorithms.add("optimized_wagner");
     }
 
     @Override
@@ -158,11 +179,44 @@ public final class StringFunction extends FunctionN {
             break;
         }
         case LEVENSHTEIN:
-        if (v1 == ValueNull.INSTANCE || v2 == ValueNull.INSTANCE) {
-            return ValueNull.INSTANCE;
-        }
-        v1 = ValueInteger.get(levenshtein(v1.getString(), v2.getString()));
-        break;            
+            Value v3 = args[2].getValue(session);
+            String algorithm;
+            if (v3 == ValueNull.INSTANCE) {
+                algorithm = "wagner";
+            } else {
+                algorithm = v3.getString().toLowerCase();
+            }
+            if (v1 == ValueNull.INSTANCE || v2 == ValueNull.INSTANCE || (!levenshteinAlgorithms.contains(algorithm))) {
+                return ValueNull.INSTANCE;
+            }
+            String string1 = v1.getString();
+            String string2 = v2.getString();
+            if (Math.min(string1.length(), string2.length())==0) {
+                return ValueInteger.get(Math.max(string1.length(), string2.length()));
+            }
+            switch (algorithm) {
+
+                case "wagner": {
+                    v1 = ValueInteger.get(wagner(string1, string2));
+                    break;
+                }
+
+                case "prefsuf": {
+                    v1 = ValueInteger.get(prefSuf(string1, string2));
+                    break;
+                }
+
+                case "optimized_wagner": {
+                    v1 = ValueInteger.get(optimizedWagner(string1, string2));
+                    break;
+                }
+
+                case "recursive": {
+                    v1 = ValueInteger.get(recursive(string1, string2));
+                    break;
+                }
+            }
+            break;            
 
         default:
             throw DbException.getInternalError("function=" + function);
@@ -170,7 +224,7 @@ public final class StringFunction extends FunctionN {
         return v1;
     }
 
-    private static int levenshtein(String s1, String s2) {
+    private static int wagner(String s1, String s2) {
 		int d[][] = new int[s1.length() + 1][s2.length() + 1];
 		
 		// Initialising first column:
@@ -200,6 +254,71 @@ public final class StringFunction extends FunctionN {
 		
 		return d[s1.length()][s2.length()];
 	}
+
+    public static int optimizedWagner(String word1, String word2){
+        int len1,len2,indi,prev_dia,prev_abov,i,j;
+        int [] buffer;
+        prev_abov=0;
+        len1 = word1.length();
+        len2 = word2.length();
+        buffer = new int [len2+1];
+        for (j = 0; j < len2+1; j++){
+            buffer[j] = j;
+        }
+        for (i=0; i<=len1-1;i++){
+            buffer[0]=i+1;
+            for (j = 0; j <= len2-1; j++){
+                indi = ((word1.charAt(i) != word2.charAt(j)) ? 1 : 0);
+                prev_dia = prev_abov;
+                prev_abov = buffer [j+1];
+                buffer[j+1] = Math.min(Math.min(prev_abov+1,buffer[j]+1),prev_dia+indi);
+            }
+        }
+        return buffer [len2];
+    }
+
+    public static int mismatch (String a, String b){
+        for(int i=0; i<b.length(); i++){
+            if(a.charAt(i) != b.charAt(i))
+            {
+                return i;
+            }
+        }
+        return b.length();
+    }
+
+    public static String reverseString(String str){  
+        StringBuilder sb=new StringBuilder(str);  
+        sb.reverse();  
+        return sb.toString();  
+    }  
+
+    public static int prefSuf(String word1, String word2){
+        int prefix,suffix;
+
+        if (word1.length() < word2.length()){
+            return prefSuf (word2, word1);
+        }
+
+        prefix = mismatch (word1, word2);
+
+        word1 = word1.substring(prefix);
+        word2 = word2.substring(prefix);
+
+        suffix = mismatch(reverseString(word1), reverseString(word2));
+
+        word1 = word1.substring(0,word1.length()- suffix);
+        word2 = word2.substring(0,word2.length()- suffix);
+
+        if (word1.length()==0){
+            return word2.length();
+        }
+        else if (word2.length()==0){
+            return word1.length();
+        }
+        return optimizedWagner(word1,word2);
+    }
+
 	
   // Helper funciton used by findDistance()
 	private static int findMin(int x, int y, int z) {
@@ -210,6 +329,26 @@ public final class StringFunction extends FunctionN {
 		else
 			return z;
 	}
+
+    private static int recursive(String string1,String string2) {
+
+        if (Math.min(string1.length(), string2.length())==0) {
+            return Math.max(string1.length(), string2.length());
+        }
+
+        int replace = recursive(string1.substring(1), string2.substring(1)) + isCharacterDif(string1.charAt(0), string2.charAt(0));
+
+        int insert = recursive(string1, string2.substring(1))+ 1;
+
+        int delete = recursive(string1.substring(1), string2)+ 1;
+
+        return findMin(replace, insert, delete);
+    }
+
+    static int isCharacterDif(char c1, char c2) {
+        return c1 == c2 ? 0 : 1;
+    }
+
 
     private static int locate(String search, String s, int start) {
         if (start < 0) {
