@@ -75,9 +75,9 @@ public final class StringFunction extends FunctionN {
         this.function = function;
         levenshteinAlgorithms = new HashSet<String> ();
         levenshteinAlgorithms.add("wagner");
-        levenshteinAlgorithms.add("prefsuf");
+        levenshteinAlgorithms.add("prefix_suffix");
         levenshteinAlgorithms.add("recursive");
-        levenshteinAlgorithms.add("optimized_wagner");
+        levenshteinAlgorithms.add("wagner_optimized");
     }
 
     public StringFunction(Expression arg1, Expression arg2, Expression arg3, Expression arg4, int function) {
@@ -85,9 +85,9 @@ public final class StringFunction extends FunctionN {
         this.function = function;
         levenshteinAlgorithms = new HashSet<String> ();
         levenshteinAlgorithms.add("wagner");
-        levenshteinAlgorithms.add("prefsuf");
+        levenshteinAlgorithms.add("prefix_suffix");
         levenshteinAlgorithms.add("recursive");
-        levenshteinAlgorithms.add("optimized_wagner");
+        levenshteinAlgorithms.add("wagner_optimized");
     }
 
     public StringFunction(Expression[] args, int function) {
@@ -95,9 +95,9 @@ public final class StringFunction extends FunctionN {
         this.function = function;
         levenshteinAlgorithms = new HashSet<String> ();
         levenshteinAlgorithms.add("wagner");
-        levenshteinAlgorithms.add("prefsuf");
+        levenshteinAlgorithms.add("prefix_suffix");
         levenshteinAlgorithms.add("recursive");
-        levenshteinAlgorithms.add("optimized_wagner");
+        levenshteinAlgorithms.add("wagner_optimized");
     }
 
     @Override
@@ -178,7 +178,7 @@ public final class StringFunction extends FunctionN {
             v1 = ValueVarchar.get(translate(v1.getString(), matching, replacement), session);
             break;
         }
-        case LEVENSHTEIN:
+        case LEVENSHTEIN: {
             Value v3 = args[2].getValue(session);
             String algorithm;
             if (v3 == ValueNull.INSTANCE) {
@@ -215,9 +215,10 @@ public final class StringFunction extends FunctionN {
                     v1 = ValueInteger.get(recursive(string1, string2));
                     break;
                 }
+                
             }
-            break;            
-
+            break;         
+        }
         default:
             throw DbException.getInternalError("function=" + function);
         }
@@ -227,15 +228,12 @@ public final class StringFunction extends FunctionN {
     private static int wagner(String s1, String s2) {
 		int d[][] = new int[s1.length() + 1][s2.length() + 1];
 		
-		// Initialising first column:
 		for(int i = 0; i <= s1.length(); i++)
 			d[i][0] = i;
 		
-		// Initialising first row:
 		for(int j = 0; j <= s2.length(); j++)
 			d[0][j] = j;
 		
-		// Applying the algorithm:
 		int insertion, deletion, replacement;
 		for(int i = 1; i <= s1.length(); i++) {
 			for(int j = 1; j <= s2.length(); j++) {
@@ -246,7 +244,6 @@ public final class StringFunction extends FunctionN {
 					deletion = d[i - 1][j];
 					replacement = d[i - 1][j - 1];
 					
-					// Using the sub-problems
 					d[i][j] = 1 + findMin(insertion, deletion, replacement);
 				}
 			}
@@ -274,7 +271,7 @@ public final class StringFunction extends FunctionN {
                 buffer[j+1] = Math.min(Math.min(prev_abov+1,buffer[j]+1),prev_dia+indi);
             }
         }
-        return buffer [len2];
+        return buffer[len2];
     }
 
     public static int mismatch (String a, String b){
